@@ -261,12 +261,16 @@
   (let ((root (compos-project-dir)))
     (and root (string-append root "/scheme/packages"))))
 
-;; the packages' tests and the apps': scheme/packages and scheme/apps
+;; the packages' tests and the apps': scheme/packages, scheme/apps and each
+;; directory of compos-packages
 (define (package-test-dirs)
-  (let ((root (compos-project-dir)))
-    (if root
-        (list (string-append root "/scheme/packages") (string-append root "/scheme/apps"))
-        '())))
+  ;; core's own packages and apps, then the standard packages (compos-packages)
+  (let ((root (compos-project-dir))
+        (std (and (boundp 'compos-packages-dirs) (compos-packages-dirs))))
+    (append (if root
+                (list (string-append root "/scheme/packages") (string-append root "/scheme/apps"))
+                '())
+            (or std '()))))
 
 ;; KIND is 'core or 'packages
 (define (test-files kind)
