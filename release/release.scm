@@ -50,6 +50,13 @@
   "the executable release-build makes, in the checkout's burrito_out"
   (string-append (expand-file-name release-checkout) "/burrito_out/compos_" (release-target-name)))
 
+(effects! '(read execute))
+(public! 'release-target-name
+  "(release-target-name) — the Burrito target to build: release-target, else this machine's, from uname -m once")
+(public! 'release-build-path
+  "(release-build-path) — the executable release-build makes, in the checkout's burrito_out")
+(effects! '(write execute))
+
 (define (release-stable-self?)
   "#t when this compos is the stable one: a release started from release-bin-path. A checkout started from a stable shell inherits the variable, so it must be a release too"
   (and (not (compos-project-dir))
@@ -72,7 +79,10 @@
   "build the release executable from release-checkout in a task; K gets (OK? TEXT): the build's result line and its errors"
   (shell-command->string
    (string-append
-    "rm -rf _build/prod/rel && s=$(date +%s) && MIX_ENV=prod BURRITO_TARGET=" (release-target-name)
+    "rm -rf _build/prod/rel && s=$(date +%s) && "
+    ;; zig cannot link against the Xcode 27 SDK; the Command Line Tools SDK links
+    "if [ -d /Library/Developer/CommandLineTools ]; then export DEVELOPER_DIR=/Library/Developer/CommandLineTools; fi; "
+    "MIX_ENV=prod BURRITO_TARGET=" (release-target-name)
     " mix release --overwrite > /tmp/compos-release-build.log 2>&1; rc=$?; "
     "echo \"rc=$rc $(( $(date +%s)-s ))s\"; "
     "grep -m3 -B2 -A8 -E '^\\*\\* \\(|^error' /tmp/compos-release-build.log | head -40")
