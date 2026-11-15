@@ -251,6 +251,14 @@
 
 (define panes-board--nbsp (list->string (list (integer->char 160))))
 
+(define (panes-board--depth buf id)
+  ;; how far in a row sits below the top of what is shown
+  (let* ((root (panes-board-root buf))
+         (top (cond (root (panes-board--level root))
+                    ((equal? (panes-board-view buf) 'all) 0)
+                    (else 1))))
+    (max 0 (- (panes-board--level id) top))))
+
 (define (panes-board--indent buf id)
   ;; two columns a level, in no-break spaces: the list cell collapses plain
   ;; leading spaces in the browser
