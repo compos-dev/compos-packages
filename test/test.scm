@@ -264,13 +264,27 @@
 ;; the packages' tests and the apps': scheme/packages, scheme/apps and each
 ;; directory of compos-packages
 (define (package-test-dirs)
-  ;; core's own packages and apps, then the standard packages (compos-packages)
+  ;; core's own packages and apps, the standard packages (compos-packages),
+  ;; then each community package this editor loaded, in its own clone
   (let ((root (compos-project-dir))
         (std (and (boundp 'compos-packages-dirs) (compos-packages-dirs))))
     (append (if root
                 (list (string-append root "/scheme/packages") (string-append root "/scheme/apps"))
                 '())
-            (or std '()))))
+            (or std '())
+            (package-test--clones))))
+
+(define (package-test--clones)
+  ;; a directory on load-path named for a loaded package, outside the
+  ;; checkout and the standard set: a clone, or a checkout of one's own
+  (let ((std (or (and (boundp 'compos-packages-dirs) (compos-packages-dirs)) '()))
+        (root (compos-project-dir)))
+    (filter (lambda (dir)
+              (and (file-directory? dir)
+                   (not (member dir std))
+                   (not (and root (string-prefix? root dir)))
+                   (featurep (string->symbol (file-name-nondirectory dir)))))
+            load-path)))
 
 ;; KIND is 'core or 'packages
 (define (test-files kind)
