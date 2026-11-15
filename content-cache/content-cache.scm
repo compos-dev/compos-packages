@@ -225,7 +225,9 @@
     (when (or (not last) (> (- now (cadr last)) 3600))
       (set! *content-cache-swept*
             (cons (list ns now) (filter (lambda (s) (not (equal? (car s) ns))) *content-cache-swept*)))
-      (task-spawn (lambda () (cache-sweep! ns))))))
+      ;; a package that names a cache path while it loads at boot runs before
+      ;; the interpreter is published, and a task cannot start then
+      (after-init (lambda () (task-spawn (lambda () (cache-sweep! ns))))))))
 
 (effects! '(pure))
 (public! 'content-key
