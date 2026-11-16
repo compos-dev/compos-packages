@@ -43,6 +43,9 @@ nonstandard install out of the built-in connector catalog."
     ;; the model family it serves; the adapter lists only some of these
     ;; ids (no [1m] forms), and its list is the menu
     accepts "^(claude-|opus|sonnet|haiku|default)"
+    ;; the subscription pays for every model it runs, so the usage
+    ;; ledger records the estimate of a turn, not a cost
+    subscription "."
     install (("claude" "curl -fsSL https://claude.ai/install.sh | bash")
              ("claude-agent-acp" "npm install -g --no-audit --no-fund --prefer-offline @agentclientprotocol/claude-agent-acp"))
     signin "claude"
@@ -85,6 +88,9 @@ nonstandard install out of the built-in connector catalog."
   '(cmd "opencode acp"
     description "OpenCode — multi-provider ACP agent"
     model-config #t
+    ;; only the Go models are on a subscription; the ledger bills the
+    ;; pay-as-you-go opencode/ models and the user's own provider keys
+    subscription "^opencode-go/"
     ;; opencode drops _meta.systemPrompt: our sections ride the first turn
     system-in-prompt #t))
 
@@ -101,6 +107,7 @@ nonstandard install out of the built-in connector catalog."
     ;; opencode drops _meta.systemPrompt: our sections ride the first turn
     system-in-prompt #t
     accepts "^opencode-go/"
+    subscription "^opencode-go/"
     signin "opencode auth login"))
 
 (define-connector! "deepseek"
@@ -123,7 +130,10 @@ nonstandard install out of the built-in connector catalog."
     ;; carries the profile patch that turns the harness's own tools and
     ;; prompt off
     sanitize "dsh"
-    accepts "^deepseek-"))
+    accepts "^deepseek-"
+    ;; no subscription: the provider key bills every token. The harness
+    ;; reports a bare id, and the catalog files it under deepseek
+    price-provider "deepseek"))
 
 ;; The direct lane needs one key from any provider. Each provider's key is a
 ;; secret setting; 'provider makes llm-key answer from it, and 'model is the
