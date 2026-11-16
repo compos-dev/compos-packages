@@ -158,20 +158,63 @@
 ;; search, a query or a string is not an act, so nothing else reads it.
 (define *permission-eval-tools* '("eval-scheme" "mcp__compos__eval-scheme"))
 
+;; the Scheme an eval-scheme call carries: its code, or the code inside
+;; the JSON arguments of the MCP proxy
+(define (permission-eval-code raw)
+  (if (and (string? raw) (string-prefix? "{" (string-trim raw))
+           (boundp (quote mcp-proxy--code)))
+      (or (mcp-proxy--code raw) raw)
+      raw))
+
 (define (permission-shell-text title kind raw)
   "the text decide's deny-list reads: a shell line whole, the shell commands of an eval-scheme payload, #f for any other call"
   (cond ((equal? kind "execute") (string-append (or title "") " " (or raw "")))
         ((member title *permission-eval-tools*)
-         (let* ((code (if (and (string? raw) (string-prefix? "{" (string-trim raw))
-                               (boundp (quote mcp-proxy--code)))
-                          (or (mcp-proxy--code raw) raw)
-                          raw))
+         (let* ((code (permission-eval-code raw))
                 (forms (and code (ignore-errors (lambda () (scheme-read code))))))
            ;; a payload that does not read is judged whole, as before
            (if (and (pair? forms) (boundp (quote mcp-proxy--shell-commands)))
                (string-join (mcp-proxy--shell-commands forms) " ; ")
                code)))
         (else #f)))
+
+;; A turn that an outsider's words started may not send unasked. It holds
+;; text that nobody the user trusts wrote, and the editor holds the user's
+;; data, so a send in that turn waits for the user, whatever the stance:
+;; untrusted input, private data and a way out never meet without a
+;; person (the "Rule of Two"). agent-note-turn-source! (agent-session.scm)
+;; keeps the mark. A read and a local write still run.
+(define *permission-send-effects* '("external" "spend" "destroy" "unknown" "execute"))
+
+(define (permission-outside-text? buf)
+  (and buf (buffer-exists? buf) (buffer-local-value 'agent-outside-text buf) #t))
+
+(define (permission-send-effects? fx)
+  (and (pair? fx)
+       (pair? (filter (lambda (f) (member f *permission-send-effects*)) fx))))
+
+(define (permission-may-send? title kind raw)
+  "#t when the call can send, spend or destroy: a shell line, an eval-scheme payload that runs a shell command, calls a function with such an effect or does not read, a tool or command with such an effect or none on record"
+  (cond ((member title *permission-eval-tools*)
+         (let* ((code (permission-eval-code raw))
+                (forms (and code (ignore-errors (lambda () (scheme-read code))))))
+           (or (not (pair? forms))
+               (not (boundp (quote mcp-proxy--calls)))
+               (pair? (mcp-proxy--shell-commands forms))
+               (pair? (filter (lambda (name)
+                                (let ((e (catalog-entry 'function name)))
+                                  (and e (permission-send-effects? (plist-get e 'effects)))))
+                              (mcp-proxy--calls forms))))))
+        ((equal? kind "execute") #t)
+        ((equal? kind "tool")
+         (let ((fx (permission-tool-effects title)))
+           (or (not fx) (permission-send-effects? fx))))
+        ((equal? kind "command")
+         (let ((e (catalog-entry 'command title)))
+           (or (not e) (permission-send-effects? (plist-get e 'effects)))))
+        ;; the adapter's own kinds: delete destroys, fetch goes out, and
+        ;; other says nothing of what it does
+        (else (and (member kind '("delete" "fetch" "other")) #t))))
 
 ;; (permit? BUF TITLE KIND RAW) -> allow-always | ask | reject: the one
 ;; permission decision. Every lane asks it: the ACP request, the direct
@@ -184,6 +227,11 @@
                (and shell (permission-denied-verb? shell)))
              'ask)
             ((profile-denies? profile text) 'reject)
+            ;; a turn an outsider's words started may not send unasked,
+            ;; whatever the stance and whatever "always" said before
+            ((and (permission-outside-text? buf)
+                  (permission-may-send? title kind raw))
+             'ask)
             ;; the user already answered "always" for this verb in this
             ;; chat. It sits under the deny-list and the profile, which
             ;; no answer of the user's can wave through, and over

@@ -182,7 +182,28 @@
             (begin (buffer-set-local! buf 'chat-context-sent key)
                    (chat-context-brief buf))))))
 
+;; A turn that an outsider's words started. A listener wakes the chat with
+;; the text of a WhatsApp message, a mail, a webhook or a job: callback
+;; ("[event] "), and the model can follow what that text tells it to do.
+;; The chat keeps 'agent-outside-text until the user sends it a message
+;; while it waits, and permit? asks before such a turn sends
+;; (agent-permissions.scm). A message the user sends while the woken turn
+;; still runs leaves the mark.
+(defcustom 'agent-outside-sources '("event")
+  "The wake sources whose text an outsider can write. A turn they start asks before it sends, spends or destroys, whatever the stance, until the user speaks in the chat."
+  'group 'chat 'type 'list)
+
+(define (agent-note-turn-source! buf slug raw)
+  (let ((source (and buf (agent-wake-source raw))))
+    (cond ((not buf) #f)
+          ((member source agent-outside-sources)
+           (buffer-set-local! buf 'agent-outside-text #t))
+          ((and (not source)
+                (not (member (agent-status slug) '(running needs_attention))))
+           (buffer-set-local! buf 'agent-outside-text #f)))))
+
 (define (agent-send-msg! slug raw)
+  (agent-note-turn-source! (agent-buf slug) slug raw)
   (let* ((buf (agent-buf slug))
          ;; a one-shot note - a skill body a mode pushed - rides the next
          ;; message exactly once, then clears
