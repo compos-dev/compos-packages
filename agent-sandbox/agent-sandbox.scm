@@ -61,7 +61,7 @@
 
 (define (agent-sandbox--author-chat)
   "the chat whose agent is evaluating now, by the edit author, or #f"
-  (llm-tool-buffer))
+  (and (boundp 'llm-tool-buffer) (llm-tool-buffer)))
 
 (define (agent-sandbox-current-chat)
   "(agent-sandbox-current-chat) — the agent's chat this call runs for: the edit author, else an agent chat that is the current buffer; #f for a person"
@@ -142,7 +142,7 @@
 (effects! '(write execute))
 
 (define (shell-command->string cmd &rest more)
-  "(shell-command->string CMD [DIR] [CALLBACK]) — run CMD in a shell; stderr merges into the output. With CALLBACK, run in a Task and return at once; CALLBACK gets the output. An agent's command must pass decide-shell-policy, judged on CMD itself, and runs in its chat's sandbox when the sandbox is on."
+  "(shell-command->string CMD [DIR] [CALLBACK]) — run CMD in a shell; stderr merges into the output. With CALLBACK, run in a Task and return at once; CALLBACK gets the output, with the agent's chat as the current buffer, so an event-publish! of a job: topic there wakes that chat. An agent's command must pass decide-shell-policy, judged on CMD itself, and runs in its chat's sandbox when the sandbox is on."
   (let* ((author (current-edit-author))
          (chat (agent-sandbox--author-chat))
          (no (and (string? author) (string-prefix? "agent:" author) (string? cmd)
@@ -150,7 +150,17 @@
                   (decide-shell-command-verdict cmd))))
     (when no (error no))
     (apply %shell-command->string-builtin
-           (cons (if chat (agent-sandbox-wrap cmd chat) cmd) more))))
+           (cons (if chat (agent-sandbox-wrap cmd chat) cmd)
+                 (map (lambda (a) (agent-sandbox--in-chat chat a)) more)))))
+
+(define (agent-sandbox--in-chat chat f)
+  "F run with CHAT as the current buffer when F is a callback and CHAT is live, so what F does is done for the chat that asked; else F"
+  (if (and chat (procedure? f))
+      (lambda args
+        (if (buffer-exists? chat)
+            (with-current-buffer chat (lambda () (apply f args)))
+            (apply f args)))
+      f))
 
 (effects! '(write))
 
