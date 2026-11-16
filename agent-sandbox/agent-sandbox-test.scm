@@ -83,3 +83,22 @@
       (check-false! (with-edit-author #f (lambda () (write-refusal "/tmp/zz-sandbox-never-written" b #f)))
                     "the user's own save is not an agent's")
       (buffer-kill! b))))
+
+(deftest 'a-shell-callback-publishes-for-the-chat-that-asked
+  "an agent's shell callback runs in its chat, whatever buffer is current when the output comes, so a job: event it publishes wakes that chat"
+  (lambda ()
+    (let ((chat (test-buffer! "*zz-sandbox-chat*" ""))
+          (other (test-buffer! "*zz-sandbox-other*" "")))
+      (buffer-set-local! chat 'chat-id "chat:7:8")
+      (with-stubs (list (list 'agent-sandbox--author-chat (lambda () chat))
+                        (list 'agent-sandbox-wrap (lambda (cmd . _) cmd))
+                        (list '%shell-command->string-builtin
+                              (lambda (cmd dir k) (with-current-buffer other (lambda () (k "out"))))))
+        (lambda ()
+          (let ((topic #f))
+            (shell-command->string "echo out" "/tmp" (lambda (out) (set! topic (event-job-topic "job:zz"))))
+            (check-equal! topic "job:7-8:zz" "the callback's job: topic is the asking chat's"))))
+      (check-equal! (with-current-buffer other (lambda () (event-job-topic "job:zz"))) "job:zz"
+                    "outside the callback another buffer stays as it is")
+      (buffer-kill! chat)
+      (buffer-kill! other))))
