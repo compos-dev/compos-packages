@@ -406,6 +406,11 @@
            "field; g refreshes, c clears, and q quits.")
     'buffer *telemetry-buffer*
     'rows telemetry--rows
+    ;; the list widget anchors and clicks rows by a string key
+    'key (lambda (buf row)
+           (string-append (number->string (or (plist-get row 'time-ms) 0)) "/"
+                          (or (plist-get row 'owner) "") "/"
+                          (or (plist-get row 'label) "")))
     'columns telemetry--wide-columns
     'cells telemetry--cells
     'layouts (list (list 'name 'narrow
@@ -629,8 +634,8 @@
            "gap in the column is a gap in the turn. g redraws; q quits.")
     'buffer *chat-perf-buffer*
     'rows (lambda (buf) (chat-perf--keep! buf))
-    'id (lambda (row) (string-append (chat-perf--step row) "@"
-                                     (number->string (chat-perf--end row))))
+    'key (lambda (buf row) (string-append (chat-perf--step row) "@"
+                                          (number->string (chat-perf--end row))))
     'columns (lambda (buf)
                (list (list "step" 22)
                      (list "ms" 7 'right)
