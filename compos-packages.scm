@@ -89,6 +89,7 @@
     (agent-sandbox)
     (todo)
     (agent-listen)
+    (llm-costs)
     (telemetry)
     (release)
     (test)

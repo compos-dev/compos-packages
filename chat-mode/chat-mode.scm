@@ -2927,9 +2927,8 @@ input start, and a region worked out again would cut the wrong bytes."
             (window-list)))
 
 ;;; --- llm cost inspection -----------------------------------------------------
-;;; Every request is priced (models.dev catalog, cached in ~/.compos/llmdb.json,
-;;; refreshed daily) and recorded in ~/.compos/llm-usage.jsonl; each chat also
-;;; sums its own spend in the 'chat-cost buffer-local.
+;;; Each chat sums its own spend in the 'chat-cost buffer-local. The ledger of
+;;; every turn and its report, M-x llm-costs, are in the llm-costs package.
 
 ;; What a chat cost, and — the number that decides whether it was worth it
 ;; — how much of its input the provider served from cache. A conversation
@@ -2978,35 +2977,6 @@ input start, and a region worked out again would cut the wrong bytes."
                       (if tc (string-append " (" (format-usd tc) ")") "")))
                   ""))))))
   'modes '(chat-mode))
-
-(define-command "llm-costs" "Show LLM spend by day and model (the usage ledger)"
-  (lambda ()
-    (let ((rows (llm-cost-report))
-          (buf "*llm-costs*"))
-      (buffer-create buf)
-      (buffer-delete-range! buf 0 (string-byte-length (buffer-text buf)))
-      (buffer-append! buf
-        (fold (lambda (acc r)
-                (string-append acc
-                  (plist-get r 'day) "  "
-                  (format-usd (plist-get r 'cost)) "  "
-                  (number->string (plist-get r 'requests)) " reqs  "
-                  (number->string (plist-get r 'input)) "→"
-                  (number->string (plist-get r 'output)) "  "
-                  ;; the cache columns: read is what the prefix cost a tenth
-                  ;; of, written is what it cost a quarter more than usual
-                  "cache " (number->string (plist-get r 'cache-read)) "r/"
-                  (number->string (plist-get r 'cache-write)) "w  "
-                  (let ((h (plist-get r 'hit-rate)))
-                    (string-pad-right
-                      (if h (string-append (number->string h) "% cached") "") 12))
-                  "  " (plist-get r 'model) "\n"))
-              (string-append
-                "LLM spend · ledger ~/.compos/llm-usage.jsonl · per-chat: C-c $\n"
-                "hit rate is cached input over billed input: low means the "
-                "prefix is being rewritten every turn\n\n")
-              rows))
-      (switch-to-buffer! buf))))
 
 ;; a new chat buffer in the current group; the old conversation stays.
 ;; The frame's group wins; a buffer outside any group founds one only
