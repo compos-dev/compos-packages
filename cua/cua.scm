@@ -45,9 +45,101 @@
   'modes '(cua-mode))
 (define-command "cua-select-all" "Select the entire buffer"
   (lambda ()
-    (set-mark! (buffer-size (current-buffer)))
-    (goto-char! 0))
+    ;; Point is the user's: selecting everything does not move it. The
+    ;; selection is a state of the buffer, drawn as an overlay. The next
+    ;; command gets the whole buffer as its region (cua--select-all-pre!),
+    ;; and point is back where it was when the command is done.
+    (let ((buf (current-buffer)))
+      (buffer-marker-local! buf 'select-all-from)
+      (buffer-set-local! buf 'select-all-from (point))
+      (buffer-set-local! buf 'select-all #t)
+      (overlay-set-range! buf 'cua-select-all 0 (+ 1 (buffer-size buf))
+                          (list (list 0 (buffer-size buf) "cua-select-all")))))
   'modes '(cua-mode))
+
+(defface! 'cua-select-all 'inherit 'region)
+
+(define (cua--select-all-on? buf)
+  (and (buffer-exists? buf) (eq? (buffer-local-value 'select-all buf) #t)))
+
+(define (cua--select-all-off! buf)
+  (when (cua--select-all-on? buf)
+    (buffer-set-local! buf 'select-all #f)
+    (overlay-set-range! buf 'cua-select-all 0 (+ 1 (buffer-size buf)) '())))
+
+;; the buffer whose selection the running command holds as a real region
+(define *cua-select-all-held* #f)
+
+;; typed text and a delete take the selection's place
+(define (cua--select-all-replaces? cmd)
+  (or (member cmd '("self-insert-command" "newline" "yank"))
+      (string-contains? cmd "delete-backward")
+      (string-contains? cmd "delete-char")
+      (string-contains? cmd "delete-forward")))
+
+;; Before a command: the selection becomes the region it stands for, mark
+;; at the end and point at the start, for as long as the command runs.
+(define (cua--select-all-pre! . _)
+  (let ((buf (current-buffer)) (cmd (this-command)))
+    (when (and (cua--select-all-on? buf) (not (equal? cmd "cua-select-all")))
+      (if (equal? cmd "keyboard-quit")
+          (cua--select-all-off! buf)
+          (begin
+            (set! *cua-select-all-held* buf)
+            (set-mark! (buffer-size buf))
+            (goto-char! 0)
+            (when (cua--select-all-replaces? cmd)
+              (delete-region!)
+              (set-mark! #f)))))))
+
+;; After it: point goes back to its place, which a marker kept through
+;; the command's edits, and the selection is over.
+(define (cua--select-all-post! . _)
+  (let ((buf *cua-select-all-held*))
+    (when (and buf (not (equal? (this-command) "cua-select-all")))
+      (set! *cua-select-all-held* #f)
+      (when (buffer-exists? buf)
+        (with-current-buffer buf
+          (lambda ()
+            ;; the mark this selection set, when the command left it
+            (when (and (mark) (= (mark) (buffer-size buf)))
+              (set-mark! #f))
+            (let ((from (buffer-local-value 'select-all-from buf)))
+              (when (number? from) (goto-char! (min from (buffer-size buf)))))))
+        ;; a command that opened a prompt has not run yet: the selection waits
+        (unless (minibuffer-active?) (cua--select-all-off! buf))))))
+
+;; the user moved the caret: the selection is over, and point is theirs
+(define (cua--select-all-moved! buf)
+  (cua--select-all-off! buf))
+
+(add-hook! 'pre-command-hook 'cua--select-all-pre!)
+(add-hook! 'post-command-hook 'cua--select-all-post!)
+(add-hook! 'point-motion-hook 'cua--select-all-moved!)
+
+;; Cmd-C with no native selection and Cmd-V arrive from the browser as
+;; events, not commands, so no command hook runs. The two functions they
+;; call get the same region around them, and point goes back after.
+(define (cua--select-all-around orig . args)
+  (let ((buf (current-buffer)))
+    (if (cua--select-all-on? buf)
+        (begin
+          (set-mark! (buffer-size buf))
+          (goto-char! 0)
+          (let ((value (apply orig args)))
+            (when (and (mark) (= (mark) (buffer-size buf))) (set-mark! #f))
+            (let ((from (buffer-local-value 'select-all-from buf)))
+              (when (number? from) (goto-char! (min from (buffer-size buf)))))
+            (cua--select-all-off! buf)
+            value))
+        (apply orig args))))
+
+(advice-add! 'clipboard-copy 'around 'cua-select-all cua--select-all-around)
+(advice-add! 'clipboard-paste! 'around 'cua-select-all cua--select-all-around)
+;; Cmd-C and Cmd-X on an editable surface (the browser sends no range
+;; when its own selection is a caret)
+(advice-add! 'clipboard-copy-range 'around 'cua-select-all cua--select-all-around)
+(advice-add! 'clipboard-cut-range 'around 'cua-select-all cua--select-all-around)
 
 ;; a page is a screenful of visual rows, the same page the plain motion
 ;; steps by (visual-page!)
