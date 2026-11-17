@@ -2301,6 +2301,14 @@
                       (decide-shell-read-answer (mcp-proxy--code args-json))))
          (refusal (and (not answer) (mcp-proxy--shell-refusal name args-json)))
          (verdict (cond ((or answer refusal) 'deny)
+                        ;; permit? sees no chat on this lane, so the mark of
+                        ;; a turn an outsider started is read here
+                        ((and slug (boundp (quote permission-outside-text?))
+                              (permission-outside-text? (agent-buf slug))
+                              (permission-may-send? name "tool"
+                                (or (and (equal? name "eval-scheme") (mcp-proxy--code args-json))
+                                    raw)))
+                         'ask)
                         ((mcp-proxy--granted? slug name args-json raw) 'allow-always)
                         (else (mcp-proxy--shell-ask name args-json
                                 (permit? #f name "tool"
