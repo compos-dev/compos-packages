@@ -9,7 +9,8 @@
 ;;; SPEC is a plist:
 ;;;
 ;;;   topic "whatsapp:919902020677"   the topic, or a prefix ending in *
-;;;   kind received                   only events of this kind
+;;;   kind received                   only events of this kind; with no
+;;;                                   kind, every kind except sent
 ;;;   match "Vipul"                   only events whose data holds this text
 ;;;   task ID                         the task the agent waits on, for its brief
 ;;;   keep #t                         listen on after the first event
@@ -66,9 +67,15 @@
         ((buffer-exists? who) (buffer-local-value 'chat-id who))
         (else #f)))
 
+;; A listener with no kind takes every kind except sent. The feeds publish
+;; the user's own outgoing messages as sent, on the topic of the
+;; conversation. Without this rule, a listener that keeps listening wakes
+;; its agent with the reply that the agent sent itself. A listener that
+;; names a kind, sent too, takes only that kind.
 (define (agent-listen--wants? l e)
-  (let ((kind (plist-get l 'kind)) (match (plist-get l 'match)))
-    (and (or (not kind) (equal? kind (format "~a" (plist-get e 'kind))))
+  (let ((kind (plist-get l 'kind)) (match (plist-get l 'match))
+        (got (format "~a" (plist-get e 'kind))))
+    (and (if kind (equal? kind got) (not (equal? got "sent")))
          (or (agent-listen--blank? match)
              (string-contains? (string-downcase (format "~s" (plist-get e 'data)))
                                (string-downcase match))))))
@@ -327,7 +334,7 @@
   (let ((id (and chat (agent-listen--chat-id chat))))
     (filter (lambda (l) (or (not id) (equal? (plist-get l 'chat) id))) *agent-listeners*)))
 
-(public! 'agent-listen! "(agent-listen! SPEC [NOTE]) — make this chat's agent listen for an event, such as a WhatsApp reply, or wake at a time; it gets the event as a message. SPEC: topic, kind, match, task, keep, chat, at (\"YYYY-MM-DD HH:MM\" local)")
+(public! 'agent-listen! "(agent-listen! SPEC [NOTE]) — make this chat's agent listen for an event, such as a WhatsApp reply, or wake at a time; it gets the event as a message. SPEC: topic, kind (none: every kind except sent), match, task, keep, chat, at (\"YYYY-MM-DD HH:MM\" local)")
 (public! 'agent-unlisten! "(agent-unlisten! ID) — stop the listener ID, and say so in the log")
 (public! 'agent-listen-extend! "(agent-listen-extend! ID DAYS) — the listener ID is due DAYS from now")
 (public! 'agent-listen-due "(agent-listen-due L) — when the listener L is due, in unix seconds")
