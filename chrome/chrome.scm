@@ -616,6 +616,12 @@
   (let ((g (or g (buffer-group (current-buffer)) (frame-group))))
     (and g (group-setting g 'browser-window))))
 
+(define (chrome-group-profile &optional g)
+  "the Chrome profile id group G is pinned to, chosen in M-x browsers with
+   browsers-pin-profile, or #f; G defaults as in chrome-group-window"
+  (let ((g (or g (buffer-group (current-buffer)) (frame-group))))
+    (and g (group-setting g 'browser-profile))))
+
 (define (chrome-window-resolve!)
   (or (chrome-group-window)
       (chrome-window)
@@ -762,6 +768,8 @@
   "(chrome-window-resolve!) — the browser window to work in: the group's own (chrome-group-window), else this frame's, asking the browser when the extension has not said; remembers its own frame's answer")
 (public! 'chrome-group-window
   "(chrome-group-window [GROUP]) — the browser window GROUP works in, or #f; GROUP defaults to the group at hand")
+(public! 'chrome-group-profile
+  "(chrome-group-profile [GROUP]) — the Chrome profile id GROUP is pinned to, or #f; GROUP defaults to the group at hand")
 
 ;;; --- the editor page's own DOM ------------------------------------------------
 ;;; A UI change is verified on the page the user looks at, not on a mock.
