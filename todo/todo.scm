@@ -2302,7 +2302,6 @@
   (todo--detail-render! (current-buffer)))
 
 (define-mode "todo-detail-mode" todo--detail-setup!)
-(mode-put! "todo-detail-mode" 'chat-follow? #t)
 (mode-put! "todo-detail-mode" 'chat-subject "todos")
 (mode-put! "todo-detail-mode" 'agent-chat
   (lambda (buf) (let ((t (todo--detail-task buf))) (and t (todo--chat-of t)))))
@@ -2773,7 +2772,7 @@
     'buffer *todo-buffer*
     'special #f
     ;; moving changes nothing beside the list; RET (todo-show) opens the
-    ;; row's page, and the page's chat-follow? brings its chat
+    ;; row's page, and chat-follow-modes brings its chat
     'head-blocks todo--tab-blocks
     'title (lambda (buf) (string-append "Todos   " (todo--view buf) " · by " (todo--sort-by buf)))
     'title-spans (lambda (buf)

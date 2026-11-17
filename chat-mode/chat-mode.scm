@@ -879,8 +879,16 @@
 
 (define (chat-mode-title src) (chat-mode-pick src *chat-titles*))
 
-;; A mode with chat-follow? brings up the agent chat of its buffer whenever
-;; the buffer shows: (mode-put! MODE 'chat-follow? #t). The mode's
+(defcustom 'chat-follow-modes '("todo-detail-mode")
+  "The modes whose page brings up its chat beside it when it shows, as a list
+of mode names. Take a mode out and its page opens alone; M-o still goes to
+the chat."
+  'group 'chat 'type 'list)
+
+(define (chat-follow-mode? mode) (and mode (member mode chat-follow-modes) #t))
+
+;; A mode in chat-follow-modes brings up the agent chat of its buffer whenever
+;; the buffer shows. The mode's
 ;; 'agent-chat (BUF) names that chat; without one it is the buffer's companion.
 ;; The chats collect in one window: one with no subject takes the mode's
 ;; 'chat-subject, else the mode's name, and goes to the window that shows a
@@ -899,7 +907,7 @@
 
 (define (chat-follow! buf)
   (let ((mode (and (string? buf) (buffer-local-value 'mode-name buf))))
-    (when (mode-get mode 'chat-follow?)
+    (when (chat-follow-mode? mode)
       (let ((chat (buffer-agent-chat buf)))
         (when (and chat (buffer-known? chat) (not (window-showing chat)))
           (let* ((subject (or (chat-subject chat)
@@ -913,9 +921,11 @@
                                              (equal? (chat-subject (window-buffer w)) subject)))
                             (display--work-windows))))
             (cond (win (window-set-buffer! win chat))
-                  ((null? held) (display-buffer chat)))))))))
+                  ((null? held) (display-buffer chat))
+                  ;; never over the page: the pane beside it
+                  (else (panes-display-beside! chat buf)))))))))
 (public! 'buffer-agent-chat "(buffer-agent-chat BUF) — the agent chat of BUF: its mode's 'agent-chat, else its companion chat, or #f")
-(public! 'chat-follow! "(chat-follow! BUF) — when BUF's mode has chat-follow?, show BUF's agent chat too")
+(public! 'chat-follow! "(chat-follow! BUF) — when BUF's mode is in chat-follow-modes, show BUF's agent chat too")
 
 (public! 'mode-chat-opening!
   "(mode-chat-opening! MODE TEXT) — TEXT, or (TEXT SOURCE), is the first prompt of a new chat made for a buffer in MODE")
