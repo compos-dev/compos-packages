@@ -40,6 +40,7 @@
 (jj :requires () :api 1)
 (llm-config :requires (transient) :api 1)
 (llm-connectors :requires (setup tabulated-list chat-mode) :api 1)
+(llm-costs :requires (workflows) :api 1)
 (llm-gate :requires () :api 1)
 (llm-presets :requires (tabulated-list) :api 1)
 (lsp :requires (tabulated-list) :api 1)
