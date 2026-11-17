@@ -18,8 +18,30 @@
 
 ;;; --- rendered page typography -----------------------------------------------
 
-(define *preview-serif* "Spectral,Georgia,serif")
-(define *preview-mono* "'IBM Plex Mono',ui-monospace,Menlo,monospace")
+;; The theme's own stacks, so a theme's fonts and theme-monospace reach
+;; rendered pages too.
+(define *preview-serif* "var(--font-serif)")
+(define *preview-mono* "var(--font-mono)")
+
+;; An HTML page renders in a frame of its own, where the theme's CSS
+;; variables do not reach, so the 'preview face carries real names: the
+;; theme's own serif or mono family, else the built-in stack. With
+;; theme-monospace on, every page takes the mono one.
+(define (preview--face-family v)
+  (let* ((all-mono? (and (boundp 'theme-monospace) theme-monospace))
+         (var? (string-prefix? "var(" v)))
+    (if (not (or var? all-mono?))
+        v
+        (let* ((mono? (or all-mono? (string-contains? (string-downcase v) "mono")))
+               (theme (face-attribute (if mono? 'mono 'serif) 'family)))
+          (if (and (string? theme) (> (string-length theme) 0))
+              theme
+              (if mono? "'IBM Plex Mono',ui-monospace,Menlo,monospace" "Spectral,Georgia,serif"))))))
+
+(define (preview--refresh-family! . _)
+  (set-face-attribute! 'preview 'family (preview--face-family preview-font-family)))
+
+(add-hook! 'theme-monospace-hook 'preview--refresh-family!)
 
 ;; Rows draw on the text surface, so they read the settings themselves.
 (define (preview--repaint-rows!)
@@ -32,7 +54,7 @@
 (defcustom 'preview-font-family *preview-serif*
   "Font family for rendered preview pages."
   'group 'preview
-  'set (lambda (v) (set-face-attribute! 'preview 'family v)))
+  'set (lambda (v) (set-face-attribute! 'preview 'family (preview--face-family v))))
 
 (defcustom 'preview-font-size ""
   "Font size for rendered preview pages. Empty means the default face's size."
@@ -47,7 +69,7 @@
   'set (lambda (v) (set-face-attribute! 'preview 'measure v)))
 
 (set-face-attribute! 'preview
-  'family preview-font-family
+  'family (preview--face-family preview-font-family)
   'size preview-font-size
   'measure preview-measure)
 
@@ -57,7 +79,7 @@
 ;; measure, because a monospace character is wider and the same character
 ;; count needs more em. Both read at the default face's size.
 (define (preview-typography)
-  (if (string-contains? preview-font-family "Mono") "mono" "serif"))
+  (if (string-contains? (string-downcase preview-font-family) "mono") "mono" "serif"))
 
 (define (preview-typography! view)
   (let ((mono? (equal? view "mono")))
@@ -76,6 +98,10 @@
 
 (public! 'preview-font-toggle
   "(run-command \"preview-font-toggle\") — flip rendered pages between serif and monospace")
+
+(define-command "preview-monospace"
+  "Toggle monospace in rendered preview pages, for morg and every other preview"
+  (lambda () (run-command "preview-font-toggle")))
 (public! 'preview-typography
   "(preview-typography) — the type rendered pages use now: \"mono\" or \"serif\"")
 (public! 'preview-typography!

@@ -695,20 +695,22 @@
 
 ;;; --- fontification -----------------------------------------------------------
 
+;; The colours are the theme's own roles, so every theme, light or dark,
+;; keeps them legible: code reads as a string, a task's state as its tone.
 (defface! 'morg-code
-  'fg "#3d6b4f"
+  'fg "var(--ts-string-fg)"
   'family "'IBM Plex Mono',ui-monospace,Menlo,monospace")
 (defface! 'morg-bold 'weight "700")
 (defface! 'morg-italic 'style "italic")
-(defface! 'morg-result 'fg "#8a857a");; Each checkbox state carries its own marker face and its own text face,
+(defface! 'morg-result 'fg "var(--dim-fg)");; Each checkbox state carries its own marker face and its own text face,
 ;; so open, in progress and done read apart at a glance. The colours are
 ;; morg's own defaults; a theme that names these faces wins over them.
-(defface! 'morg-task-open 'fg "#a03020" 'weight "700")
+(defface! 'morg-task-open 'fg "var(--alert-fg)" 'weight "700")
 (defface! 'morg-task-open-text 'weight "500")
-(defface! 'morg-task-doing 'fg "#7a5a1a" 'weight "700")
-(defface! 'morg-task-doing-text 'fg "#7a5a1a" 'style "italic")
-(defface! 'morg-task-done 'fg "#3d6b4f" 'weight "700")
-(defface! 'morg-task-done-text 'fg "#8a857a" 'decoration "line-through")
+(defface! 'morg-task-doing 'fg "var(--warn-fg)" 'weight "700")
+(defface! 'morg-task-doing-text 'fg "var(--warn-fg)" 'style "italic")
+(defface! 'morg-task-done 'fg "var(--ok-fg)" 'weight "700")
+(defface! 'morg-task-done-text 'fg "var(--dim-fg)" 'decoration "line-through")
 
 ;; markdown info string -> loaded tree-sitter language, or #f.
 ;; The fence-kind registry (morg-kinds.scm) owns the mapping.
