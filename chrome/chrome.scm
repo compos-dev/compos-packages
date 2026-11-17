@@ -608,8 +608,17 @@
                (filter (lambda (t) (equal? (plist-get t 'window) here)) ts)
                ts))))))
 
+(define (chrome-group-window &optional g)
+  "the browser window group G works in, chosen in M-x browsers with d; G
+   defaults to the group of the buffer at hand, else the frame's. A chat
+   with no frame of its own works there too, so a group's background tabs
+   (a site app's live tab) land in the profile that holds its logins."
+  (let ((g (or g (buffer-group (current-buffer)) (frame-group))))
+    (and g (group-setting g 'browser-window))))
+
 (define (chrome-window-resolve!)
-  (or (chrome-window)
+  (or (chrome-group-window)
+      (chrome-window)
       (let* ((rows (chrome--frames-sync))
              (here (selected-frame))
              (mine (filter (lambda (e) (equal? (plist-get e 'frame) here)) rows)))
@@ -750,7 +759,9 @@
 (public! 'chrome-window "(chrome-window) — the browser window this frame is displayed in, or #f")
 (public! 'chrome-here "(chrome-here ARGS) — ARGS routed to the active frame's browser window, unless they already name a tab or window")
 (public! 'chrome-window-resolve!
-  "(chrome-window-resolve!) — this frame's browser window, asking the browser when the extension has not said; remembers its own frame's answer")
+  "(chrome-window-resolve!) — the browser window to work in: the group's own (chrome-group-window), else this frame's, asking the browser when the extension has not said; remembers its own frame's answer")
+(public! 'chrome-group-window
+  "(chrome-group-window [GROUP]) — the browser window GROUP works in, or #f; GROUP defaults to the group at hand")
 
 ;;; --- the editor page's own DOM ------------------------------------------------
 ;;; A UI change is verified on the page the user looks at, not on a mock.
