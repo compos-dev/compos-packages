@@ -93,6 +93,7 @@
     (release)
     (test)
     (treesit)
+    (tree-edit)
     (worktrees)
     (content-scale)
     (morg-tangle "morg/morg-tangle.scm")
